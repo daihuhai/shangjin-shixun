@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.db
+*.sqlite3
+
+# Node.js
+node_modules/
+dist/
+.vite/
+
+# 环境变量与敏感文件
+.env
+.env.local
+*.key
+*.pem
+
+# IDE / 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+logs/
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 运行时生成（上传文件、导出报告、数据库）
+backend/uploads/
+backend/data/*.db
+backend/data/exports/
+frontend/test-reports/
+
+# 调试脚本
+_check.py
+_debug_mine.py
