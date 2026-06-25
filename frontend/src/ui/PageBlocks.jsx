@@ -2,14 +2,24 @@ export function StatusChip({ children, tone = "neutral" }) {
   return <span className={`status-chip status-${tone}`}>{children}</span>;
 }
 
-export function Panel({ title, description, actions, children, onClose }) {
+export function Panel({ title, description, actions, children, onClose, badge }) {
   return (
     <section className="panel">
       {(title || actions || onClose) && (
         <div className="panel-head">
-          <div>
-            {title ? <h3>{title}</h3> : null}
-            {description ? <p>{description}</p> : null}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+            <div>
+              {title ? <h3>{title}</h3> : null}
+              {description ? <p>{description}</p> : null}
+            </div>
+            {badge ? (
+              <span style={{
+                fontSize: 11, fontWeight: 600, color: "#2f64ff",
+                background: "#e8f0fe", padding: "3px 10px",
+                borderRadius: "999px", letterSpacing: "0.03em",
+                whiteSpace: "nowrap"
+              }}>{badge}</span>
+            ) : null}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             {actions}

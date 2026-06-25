@@ -478,3 +478,206 @@ def serialize_submission(row: dict) -> dict:
         "teacherAdjustedScore": _row_get(row, "teacher_adjusted_score"),
         "finalScore": _row_get(row, "final_score")
     }
+
+
+def student_profile(user_id: str) -> dict:
+    """生成学生画像：能力分布饼图 + 标签 + 基础数据（不含AI建议，建议由路由层异步调用LLM）"""
+    rows = build_submission_rows({"student_id": user_id})
+
+    # 收集所有评分记录的维度分数
+    similarity_scores = []
+    correctness_scores = []
+    completeness_scores = []
+    all_scores = []
+    task_titles = []
+    feedbacks = []
+    highlights_set = set()
+    errors_list = []
+    scored_task_ids = set()  # 记录有评分的任务ID（去重）
+
+    for row in rows:
+        score_row = None
+        with get_conn() as conn:
+            score_row = conn.execute(
+                "SELECT * FROM score_records WHERE submission_id = ?", (row["id"],)
+            ).fetchone()
+        if not score_row:
+            continue
+
+        dims = _parse_score_dimensions(_row_get(score_row, "dimensions_json"))
+        
+        # 尝试从新格式获取分数
+        sim = dims.get("similarityScore")
+        cor = dims.get("correctnessScore")
+        com = dims.get("completenessScore")
+        
+        # 如果新格式没有数据，尝试从旧格式维度数组中提取
+        if sim is None or cor is None or com is None:
+            for dim in dims.get("dimensions", []):
+                dim_name = dim.get("name", "")
+                dim_score = dim.get("aiScore") or dim.get("score")
+                if dim_score is not None:
+                    if "代码质量" in dim_name or "相似度" in dim_name:
+                        if sim is None:
+                            sim = dim_score
+                    elif "文档" in dim_name or "正确性" in dim_name:
+                        if cor is None:
+                            cor = dim_score
+                    elif "功能" in dim_name or "完整" in dim_name:
+                        if com is None:
+                            com = dim_score
+
+        if sim is not None:
+            similarity_scores.append(sim)
+        if cor is not None:
+            correctness_scores.append(cor)
+        if com is not None:
+            completeness_scores.append(com)
+
+        final = row.get("final_score") or _row_get(score_row, "ai_total_score")
+        if final is not None:
+            all_scores.append(final)
+            scored_task_ids.add(_row_get(row, "task_id"))  # 只记录有评分的任务
+
+        task_titles.append(_row_get(row, "task_title") or _row_get(row, "title") or "未知任务")
+        if dims.get("feedback"):
+            feedbacks.append(dims["feedback"])
+        for h in dims.get("highlights", []):
+            highlights_set.add(h)
+        for e in dims.get("errors", []):
+            errors_list.append(e)
+
+    n = len(all_scores)
+    avg_score = round(sum(all_scores) / n, 1) if all_scores else 0
+
+    # 获取学生的课程总任务数（通过学生的提交记录关联到课程）
+    total_tasks_in_course = 0
+    if rows:
+        first_row = rows[0]
+        task_id = _row_get(first_row, "task_id")
+        with get_conn() as conn:
+            course_info = conn.execute(
+                "SELECT course_id, course FROM tasks WHERE id = ?", (task_id,)
+            ).fetchone()
+            if course_info:
+                course_id = _row_get(course_info, "course_id")
+                course_name = _row_get(course_info, "course")
+                # 获取该课程的总任务数
+                if course_id:
+                    total_tasks_in_course = conn.execute(
+                        "SELECT COUNT(*) FROM tasks WHERE course_id = ?", (course_id,)
+                    ).fetchone()[0]
+                elif course_name:
+                    # 旧版任务可能没有course_id，用course名称匹配（去除空格）
+                    course_name_clean = course_name.replace(" ", "")
+                    total_tasks_in_course = conn.execute(
+                        "SELECT COUNT(*) FROM tasks WHERE REPLACE(course, ' ', '') = ?", (course_name_clean,)
+                    ).fetchone()[0]
+
+    # 能力维度计算（基于评分维度的均值，转换为百分制得分率）
+    # similarityScore: 0-50分 -> 0-100%（实践能力）
+    sim_rate = round(sum(similarity_scores) / len(similarity_scores) / 50 * 100, 1) if similarity_scores else 0
+    # correctnessScore: 0-30分 -> 0-100%（理论掌握）
+    cor_rate = round(sum(correctness_scores) / len(correctness_scores) / 30 * 100, 1) if correctness_scores else 0
+    # completenessScore: 0-20分 -> 0-100%（项目完成度）
+    com_rate = round(sum(completeness_scores) / len(completeness_scores) / 20 * 100, 1) if completeness_scores else 0
+    # 出勤与参与度 = 完成的不同任务数 / 课程总任务数 × 100%（上限100%）
+    completed_unique_tasks = len(scored_task_ids)
+    attendance_rate = min(100, round(completed_unique_tasks / max(total_tasks_in_course, 1) * 100, 1)) if total_tasks_in_course > 0 else 0
+
+    # 归一化到百分比用于饼图显示（总和=100%）
+    total_rate = sim_rate + cor_rate + com_rate + attendance_rate
+    if total_rate > 0:
+        abilities = [
+            {"name": "实践能力", "value": round(sim_rate / total_rate * 100), "rate": sim_rate, "maxScore": 50},
+            {"name": "理论掌握", "value": round(cor_rate / total_rate * 100), "rate": cor_rate, "maxScore": 30},
+            {"name": "项目完成度", "value": round(com_rate / total_rate * 100), "rate": com_rate, "maxScore": 20},
+            {"name": "出勤与参与", "value": round(attendance_rate / total_rate * 100), "rate": attendance_rate, "maxScore": total_tasks_in_course},
+        ]
+    else:
+        # 无数据时显示0%
+        abilities = [
+            {"name": "实践能力", "value": 0, "rate": 0, "maxScore": 50},
+            {"name": "理论掌握", "value": 0, "rate": 0, "maxScore": 30},
+            {"name": "项目完成度", "value": 0, "rate": 0, "maxScore": 20},
+            {"name": "出勤与参与", "value": 0, "rate": 0, "maxScore": total_tasks_in_course or 1},
+        ]
+
+    # 综合评级
+    pct = avg_score if avg_score > 0 else 0
+    if pct >= 85:
+        grade_label, grade_desc = "A", "优秀"
+    elif pct >= 70:
+        grade_label, grade_desc = "B+", "良好"
+    elif pct >= 60:
+        grade_label, grade_desc = "B", "及格"
+    elif pct >= 40:
+        grade_label, grade_desc = "C+", "需努力"
+    else:
+        grade_label, grade_desc = "C", "待提升"
+
+    # 标签推断（基于得分率）
+    if sim_rate >= 70 and cor_rate < 60:
+        learn_type = "实践驱动型"
+    elif cor_rate >= 75:
+        learn_type = "理论扎实型"
+    elif com_rate >= 70:
+        learn_type = "完整规范型"
+    else:
+        learn_type = "均衡发展型"
+
+    # 优势能力（基于得分率排序）
+    dim_sorted = sorted(abilities, key=lambda x: x["rate"], reverse=True)
+    strength = dim_sorted[0]["name"] if abilities else "数据不足"
+
+    # 薄弱环节
+    weak = dim_sorted[-1]["name"] if abilities else "数据不足"
+
+    # 成长趋势（基于最近提交 vs 平均）
+    if len(all_scores) >= 2:
+        recent_avg = sum(all_scores[:min(3, len(all_scores))]) / min(3, len(all_scores))
+        overall_avg = sum(all_scores) / len(all_scores)
+        if recent_avg > overall_avg + 5:
+            trend = "稳步上升"
+        elif recent_avg < overall_avg - 5:
+            trend = "需要加油"
+        else:
+            trend = "保持稳定"
+    else:
+        trend = "数据不足" if n == 0 else "起步阶段"
+
+    # 推荐方向
+    if weak == "理论掌握":
+        recommend = "加强理论基础学习"
+    elif weak == "实践能力":
+        recommend = "多动手做项目实战"
+    elif weak == "项目完成度":
+        recommend = "注重代码完整性"
+    else:
+        recommend = "保持积极参与"
+
+    return {
+        "gradeLabel": grade_label,
+        "gradeDesc": grade_desc,
+        "avgScore": avg_score,
+        "totalSubmissions": n,
+        "abilities": abilities,
+        "tags": {
+            "learnType": learn_type,
+            "strength": strength,
+            "weakness": weak,
+            "trend": trend,
+            "recommend": recommend,
+        },
+        # 用于AI建议的上下文数据
+        "llmContext": {
+            "taskCount": total_tasks_in_course,
+            "completedTasks": completed_unique_tasks,
+            "submissionCount": n,
+            "avgScore": avg_score,
+            "taskTitles": list(set(task_titles)),
+            "highlights": list(highlights_set)[:10],
+            "errorCount": len(errors_list),
+            "recentScores": all_scores[:5],
+        },
+    }

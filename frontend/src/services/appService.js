@@ -117,6 +117,10 @@ export async function getReportSummary(taskId) {
   return get(`/reports/summary${query}`);
 }
 
+export async function getStudentProfile() {
+  return get("/reports/profile");
+}
+
 export async function exportReport(format, reportType = "class", taskId) {
   const params = new URLSearchParams({ format, report_type: reportType });
   if (taskId) {
@@ -139,6 +143,18 @@ export async function testModel() {
 
 export async function getUserAdminData() {
   return get("/admin/users");
+}
+
+export async function createUser(payload) {
+  return post("/admin/users", payload);
+}
+
+export async function getUserProfile(userId) {
+  return get(`/admin/users/${userId}/profile`);
+}
+
+export async function getCollegeProfile(collegeName) {
+  return get(`/admin/colleges/${encodeURIComponent(collegeName)}/profile`);
 }
 
 // ---------- Courses ----------
@@ -184,6 +200,21 @@ export async function getClassStudents(className, courseId) {
   const params = new URLSearchParams();
   if (courseId) params.set("course_id", courseId);
   return get(`/classes/${encodeURIComponent(className)}/students?${params}`);
+}
+
+// ---------- Classes (Global) ----------
+export async function getCollegeNames() {
+  return get("/classes/colleges");
+}
+
+export async function getClassesByCollege(college) {
+  const params = new URLSearchParams();
+  if (college) params.set("college", college);
+  return get(`/classes/by-college?${params}`);
+}
+
+export async function getAllClasses() {
+  return get("/classes");
 }
 
 // ========== Dashboard 数据可视化 ==========

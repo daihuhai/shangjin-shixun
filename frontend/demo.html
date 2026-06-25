@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>尚进实训平台 · 项目概览</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --primary: #4F7CFF;
+      --primary-dark: #3a5fd9;
+      --secondary: #7B61FF;
+      --success: #22C55E;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --text: #1d2736;
+      --text-sub: #64748b;
+      --line: #e2e8f0;
+    }
+
+    body {
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ===== 顶部 Banner ===== */
+    .banner {
+      background: linear-gradient(135deg, #4F7CFF 0%, #7B61FF 50%, #36D1DC 100%);
+      color: white;
+      padding: 60px 40px 80px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .banner::before {
+      content: "";
+      position: absolute;
+      top: -50%;
+      right: -10%;
+      width: 500px;
+      height: 500px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+    }
+    .banner::after {
+      content: "";
+      position: absolute;
+      bottom: -30%;
+      left: -5%;
+      width: 400px;
+      height: 400px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 50%;
+    }
+    .banner h1 {
+      font-size: 42px;
+      margin-bottom: 12px;
+      position: relative;
+      z-index: 1;
+    }
+    .banner p {
+      font-size: 18px;
+      opacity: 0.95;
+      position: relative;
+      z-index: 1;
+    }
+    .banner .tagline {
+      display: inline-block;
+      margin-top: 24px;
+      padding: 6px 16px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      font-size: 14px;
+      backdrop-filter: blur(10px);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ===== 主体容器 ===== */
+    .container {
+      max-width: 1200px;
+      margin: -50px auto 40px;
+      padding: 0 24px;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ===== 数据统计卡片 ===== */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .stat-card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 22px 20px;
+      box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .stat-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-size: 24px;
+      color: white;
+    }
+    .stat-icon.s1 { background: linear-gradient(135deg, #4F7CFF, #6AA6FF); }
+    .stat-icon.s2 { background: linear-gradient(135deg, #7B61FF, #A48BFF); }
+    .stat-icon.s3 { background: linear-gradient(135deg, #36D1DC, #5FE3EE); }
+    .stat-icon.s4 { background: linear-gradient(135deg, #F5A623, #FFBE55); }
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .stat-label {
+      font-size: 13px;
+      color: var(--text-sub);
+    }
+
+    /* ===== 通用卡片 ===== */
+    .card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 28px;
+      box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
+      margin-bottom: 24px;
+    }
+    .card-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .card-title::before {
+      content: "";
+      width: 4px;
+      height: 18px;
+      background: linear-gradient(180deg, var(--primary), var(--secondary));
+      border-radius: 2px;
+    }
+    .card-subtitle {
+      color: var(--text-sub);
+      font-size: 14px;
+      margin-bottom: 22px;
+    }
+
+    /* ===== 角色模块网格 ===== */
+    .role-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    .role-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 24px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .role-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 30px rgba(79, 124, 255, 0.12);
+      border-color: var(--primary);
+    }
+    .role-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      font-size: 28px;
+      color: white;
+      margin-bottom: 16px;
+    }
+    .role-avatar.admin { background: linear-gradient(135deg, #4F7CFF, #7B61FF); }
+    .role-avatar.teacher { background: linear-gradient(135deg, #36D1DC, #5FE3EE); }
+    .role-avatar.student { background: linear-gradient(135deg, #F5A623, #FFBE55); }
+    .role-name {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .role-tag {
+      display: inline-block;
+      font-size: 12px;
+      padding: 2px 10px;
+      background: var(--bg);
+      color: var(--text-sub);
+      border-radius: 10px;
+      margin-bottom: 12px;
+    }
+    .role-desc {
+      font-size: 13px;
+      color: var(--text-sub);
+      line-height: 1.7;
+      margin-bottom: 14px;
+    }
+    .role-features {
+      list-style: none;
+      font-size: 13px;
+    }
+    .role-features li {
+      padding: 4px 0;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .role-features li::before {
+      content: "✓";
+      color: var(--success);
+      font-weight: 700;
+    }
+
+    /* ===== 功能流程时间轴 ===== */
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      position: relative;
+    }
+    .flow::before {
+      content: "";
+      position: absolute;
+      top: 24px;
+      left: 8%;
+      right: 8%;
+      height: 2px;
+      background: linear-gradient(90deg, var(--primary), var(--secondary), var(--success));
+      z-index: 0;
+    }
+    .flow-step {
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+    .flow-num {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: white;
+      border: 3px solid var(--primary);
+      color: var(--primary);
+      font-size: 18px;
+      font-weight: 700;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 10px;
+    }
+    .flow-step:nth-child(2) .flow-num { border-color: #6AA6FF; color: #6AA6FF; }
+    .flow-step:nth-child(3) .flow-num { border-color: var(--secondary); color: var(--secondary); }
+    .flow-step:nth-child(4) .flow-num { border-color: #36D1DC; color: #36D1DC; }
+    .flow-step:nth-child(5) .flow-num { border-color: var(--success); color: var(--success); }
+    .flow-name {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .flow-desc {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    /* ===== 技术栈 ===== */
+    .tech-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .tech-item {
+      background: var(--bg);
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+      border: 1px solid var(--line);
+    }
+    .tech-icon {
+      font-size: 24px;
+      margin-bottom: 6px;
+    }
+    .tech-name {
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .tech-tag {
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+
+    /* ===== 学院展示 ===== */
+    .college-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 10px;
+    }
+    .college-item {
+      background: linear-gradient(135deg, #f0f4ff, #faf5ff);
+      border: 1px solid #e0e7ff;
+      border-radius: 10px;
+      padding: 12px 8px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text);
+      transition: all 0.2s ease;
+      cursor: default;
+    }
+    .college-item:hover {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+      transform: translateY(-2px);
+    }
+
+    /* ===== Footer ===== */
+    footer {
+      text-align: center;
+      padding: 30px 20px;
+      color: var(--text-sub);
+      font-size: 13px;
+    }
+    footer a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    /* ===== 响应式 ===== */
+    @media (max-width: 900px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .role-grid { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: repeat(2, 1fr); gap: 24px; }
+      .flow::before { display: none; }
+      .tech-grid { grid-template-columns: repeat(2, 1fr); }
+      .college-grid { grid-template-columns: repeat(3, 1fr); }
+      .banner h1 { font-size: 30px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 顶部 Banner -->
+<section class="banner">
+  <h1>🚀 尚进实训平台</h1>
+  <p>智能化实训任务管理 · AI 辅助评分 · 全流程质量监控</p>
+  <span class="tagline">Train Smarter · Evaluate Fair · Insight Deeper</span>
+</section>
+
+<!-- 主体内容 -->
+<main class="container">
+
+  <!-- 数据概览 -->
+  <section class="stats">
+    <div class="stat-card">
+      <div class="stat-icon s1">🎓</div>
+      <div>
+        <div class="stat-value">12+</div>
+        <div class="stat-label">二级学院</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon s2">👨‍🏫</div>
+      <div>
+        <div class="stat-value">100+</div>
+        <div class="stat-label">任课教师</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon s3">📚</div>
+      <div>
+        <div class="stat-value">1000+</div>
+        <div class="stat-label">学生用户</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon s4">📝</div>
+      <div>
+        <div class="stat-value">5000+</div>
+        <div class="stat-label">实训提交</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 项目介绍 -->
+  <section class="card">
+    <h2 class="card-title">项目介绍</h2>
+    <p class="card-subtitle">一站式解决高校实训教学"管理乱、评分难、反馈慢"的痛点</p>
+    <p style="color: var(--text); line-height: 1.9;">
+      尚进实训平台是一款面向高校的<strong>智能化实训教学管理系统</strong>，覆盖教师发布任务、学生提交作业、AI 智能评分、教师复核、报告导出全流程。
+      平台支持多角色协同（管理员、教师、学生），内置学院 / 班级组织架构，
+      通过<strong>大模型</strong>实现作业自动解析与智能评分，让实训评价更高效、更客观、更具指导性。
+    </p>
+  </section>
+
+  <!-- 三大角色 -->
+  <section class="card">
+    <h2 class="card-title">三大角色</h2>
+    <p class="card-subtitle">清晰的角色权限划分，匹配不同工作场景</p>
+    <div class="role-grid">
+      <div class="role-card">
+        <div class="role-avatar admin">🛡️</div>
+        <div class="role-name">管理员端</div>
+        <span class="role-tag">Administrator</span>
+        <p class="role-desc">管理全平台用户、学院、班级、课程及系统配置，查看全局数据看板。</p>
+        <ul class="role-features">
+          <li>用户管理（增删改查）</li>
+          <li>学院 / 班级组织架构</li>
+          <li>学院整体画像大屏</li>
+          <li>系统配置与日志审计</li>
+        </ul>
+      </div>
+
+      <div class="role-card">
+        <div class="role-avatar teacher">👨‍🏫</div>
+        <div class="role-name">教师端</div>
+        <span class="role-tag">Teacher</span>
+        <p class="role-desc">创建课程、发布实训任务、批改作业、查看学情数据，组织教学工作。</p>
+        <ul class="role-features">
+          <li>课程与班级管理</li>
+          <li>实训任务多班级发布</li>
+          <li>AI 评分复核</li>
+          <li>班级学情数据报表</li>
+        </ul>
+      </div>
+
+      <div class="role-card">
+        <div class="role-avatar student">🎓</div>
+        <div class="role-name">学生端</div>
+        <span class="role-tag">Student</span>
+        <p class="role-desc">查看任务、提交作业、查看反馈与分数、跟踪个人学习成长轨迹。</p>
+        <ul class="role-features">
+          <li>查看实训任务</li>
+          <li>上传作业与报告</li>
+          <li>查看 AI 评分与反馈</li>
+          <li>个人学习画像</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 核心流程 -->
+  <section class="card">
+    <h2 class="card-title">核心流程</h2>
+    <p class="card-subtitle">从任务发布到智能评分，五步完成一次实训闭环</p>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-num">1</div>
+        <div class="flow-name">发布任务</div>
+        <div class="flow-desc">教师选择课程与班级，发布实训任务</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">2</div>
+        <div class="flow-name">学生提交</div>
+        <div class="flow-desc">学生在线提交文档、源码、报告</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">3</div>
+        <div class="flow-name">AI 评分</div>
+        <div class="flow-desc">大模型自动解析、多维度评分</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">4</div>
+        <div class="flow-name">教师复核</div>
+        <div class="flow-desc">核查清单逐项确认、调整分数</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">5</div>
+        <div class="flow-name">报告输出</div>
+        <div class="flow-desc">生成个人/班级学习报告</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 学院展示 -->
+  <section class="card">
+    <h2 class="card-title">已支持学院</h2>
+    <p class="card-subtitle">覆盖多类型院系，灵活适配各专业实训需求</p>
+    <div class="college-grid">
+      <div class="college-item">软件工程学院</div>
+      <div class="college-item">计算机学院</div>
+      <div class="college-item">信息工程学院</div>
+      <div class="college-item">人工智能学院</div>
+      <div class="college-item">大数据学院</div>
+      <div class="college-item">电子工程学院</div>
+      <div class="college-item">机械工程学院</div>
+      <div class="college-item">土木工程学院</div>
+      <div class="college-item">经济管理学院</div>
+      <div class="college-item">外国语学院</div>
+      <div class="college-item">艺术设计学院</div>
+      <div class="college-item">理学院</div>
+      <div class="college-item">马克思主义学院</div>
+      <div class="college-item">汽车工程学院</div>
+      <div class="college-item">材料学院</div>
+      <div class="college-item">化学化工学院</div>
+      <div class="college-item">航空航天学院</div>
+      <div class="college-item">医学院</div>
+      <div class="college-item">法学院</div>
+      <div class="college-item">新闻传播学院</div>
+      <div class="college-item">体育学院</div>
+      <div class="college-item">音乐舞蹈学院</div>
+      <div class="college-item">国际教育学院</div>
+    </div>
+  </section>
+
+  <!-- 技术栈 -->
+  <section class="card">
+    <h2 class="card-title">技术栈</h2>
+    <p class="card-subtitle">前后端分离架构，搭配 AI 大模型驱动核心能力</p>
+    <div class="tech-grid">
+      <div class="tech-item">
+        <div class="tech-icon">⚛️</div>
+        <div class="tech-name">React 19</div>
+        <div class="tech-tag">前端框架</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">⚡</div>
+        <div class="tech-name">Vite</div>
+        <div class="tech-tag">构建工具</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">🐍</div>
+        <div class="tech-name">FastAPI</div>
+        <div class="tech-tag">后端服务</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">💾</div>
+        <div class="tech-name">SQLite</div>
+        <div class="tech-tag">数据存储</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">🤖</div>
+        <div class="tech-name">豆包大模型</div>
+        <div class="tech-tag">AI 引擎</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">📊</div>
+        <div class="tech-name">ECharts</div>
+        <div class="tech-tag">数据可视化</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">🔐</div>
+        <div class="tech-name">Token 鉴权</div>
+        <div class="tech-tag">权限控制</div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">📁</div>
+        <div class="tech-name">多格式支持</div>
+        <div class="tech-tag">文件解析</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 项目亮点 -->
+  <section class="card">
+    <h2 class="card-title">项目亮点</h2>
+    <p class="card-subtitle">区别于传统实训管理工具的四大核心特色</p>
+    <div class="role-grid">
+      <div class="role-card" style="cursor: default;">
+        <div style="font-size: 36px; margin-bottom: 12px;">🤖</div>
+        <div class="role-name">AI 智能评分</div>
+        <p class="role-desc">基于豆包大模型，自动解析代码、文档、报告，多维度给出客观评分与改进建议。</p>
+      </div>
+      <div class="role-card" style="cursor: default;">
+        <div style="font-size: 36px; margin-bottom: 12px;">📈</div>
+        <div class="role-name">数据画像</div>
+        <p class="role-desc">为学生、班级、学院生成多层级数据画像，呈现学习成长曲线与风险预警。</p>
+      </div>
+      <div class="role-card" style="cursor: default;">
+        <div style="font-size: 36px; margin-bottom: 12px;">⚙️</div>
+        <div class="role-name">灵活组织</div>
+        <p class="role-desc">支持多学院、多班级、多课程灵活配置，适配各高校不同的组织架构与教学体系。</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p>© 2026 尚进实训平台 · Train Smarter, Evaluate Fair, Insight Deeper</p>
+  <p style="margin-top: 6px;">项目地址：<a href="https://github.com/">尚进实训平台</a> · 版本 v1.0.0</p>
+</footer>
+
+</body>
+</html>

@@ -5,10 +5,15 @@ import AuthShell, { AuthFieldIcon, EyeIcon, LockIcon, UserIcon, WechatIcon, Work
 import { get } from "../../api/client";
 
 /** 关键词搜索下拉选择组件 — 支持从列表选择或自由输入 */
-function SearchSelect({ options, value, onChange, placeholder }) {
+function SearchSelect({ options, value, onChange, placeholder, disabled = false }) {
   const [query, setQuery] = useState(value || "");
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
+
+  // 外部 value 变化时同步内部输入（如切换角色清空）
+  useEffect(() => {
+    setQuery(value || "");
+  }, [value]);
 
   const filtered = query.trim()
     ? options.filter((o) => o.toLowerCase().includes(query.toLowerCase()))
@@ -36,7 +41,6 @@ function SearchSelect({ options, value, onChange, placeholder }) {
 
   // 失焦时将当前输入内容同步到表单
   function handleBlur() {
-    // 延迟关闭，让点击列表项的 mousedown 先执行
     setTimeout(() => {
       if (query.trim() && query !== value) {
         confirmValue(query.trim());
@@ -64,6 +68,7 @@ function SearchSelect({ options, value, onChange, placeholder }) {
       <AuthFieldIcon><UserIcon /></AuthFieldIcon>
       <input
         value={query}
+        disabled={disabled}
         onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
         onBlur={handleBlur}
@@ -102,7 +107,9 @@ export default function RegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
-  const [classNames, setClassNames] = useState([]);
+  const [collegeNames, setCollegeNames] = useState([]);
+  const [classOptions, setClassOptions] = useState([]);
+  const [loadingClasses, setLoadingClasses] = useState(false);
   const tabRefs = useRef([null, null]);
   const [indicator, setIndicator] = useState({ left: 0, width: 0 });
   const [form, setForm] = useState({
@@ -110,17 +117,34 @@ export default function RegisterPage() {
     username: "",
     password: "",
     role: "student",
+    college: "",
     organization: "",
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // 加载学院列表
   useEffect(() => {
-    get("/classes/names")
-      .then((res) => setClassNames(Array.isArray(res) ? res : []))
+    get("/classes/colleges")
+      .then((res) => setCollegeNames(Array.isArray(res) ? res : []))
       .catch(() => {});
   }, []);
+
+  // 学生角色：选择学院后联动加载该学院下的班级
+  useEffect(() => {
+    if (form.role === "student" && form.college) {
+      setLoadingClasses(true);
+      setClassOptions([]);
+      const college = form.college;
+      get(`/classes/by-college?college=${encodeURIComponent(college)}`)
+        .then((res) => setClassOptions(Array.isArray(res) ? res : []))
+        .catch(() => setClassOptions([]))
+        .finally(() => setLoadingClasses(false));
+    } else {
+      setClassOptions([]);
+    }
+  }, [form.role, form.college]);
 
   useEffect(() => {
     // 注册页固定高亮第二个tab（注册账号），index=1
@@ -130,13 +154,56 @@ export default function RegisterPage() {
     }
   }, []);
 
+  // 切换角色时重置学院与班级选择
+  function handleRoleChange(e) {
+    const role = e.target.value;
+    setForm((prev) => ({ ...prev, role, college: "", organization: "" }));
+  }
+
+  // 选择学院
+  function handleCollegeChange(e) {
+    const college = e.target.value;
+    setForm((prev) => ({ ...prev, college, organization: "" }));
+  }
+
+  // 选择班级（学生）/学院（教师、管理员）
+  function handleOrganizationChange(e) {
+    setForm((prev) => ({ ...prev, organization: e.target.value }));
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
     setSuccess("");
+
+    // 校验：学生需选择班级，教师/管理员需选择学院
+    if (form.role === "student") {
+      if (!form.college) {
+        setError("请先选择所属学院");
+        return;
+      }
+      if (!form.organization) {
+        setError("请选择所在班级");
+        return;
+      }
+    } else {
+      if (!form.college) {
+        setError(form.role === "teacher" ? "请选择所属学院" : "请选择所属部门/学院");
+        return;
+      }
+    }
+
     setLoading(true);
     try {
-      await register(form);
+      // 教师/管理员的 organization 即为学院；学生的 organization 为班级
+      const payload = {
+        name: form.name,
+        username: form.username,
+        password: form.password,
+        role: form.role,
+        organization: form.role === "student" ? form.organization : form.college,
+      };
+      await register(payload);
       setSuccess("注册成功，即将返回登录页…");
       window.setTimeout(() => navigate("/login"), 900);
     } catch (err) {
@@ -145,6 +212,8 @@ export default function RegisterPage() {
       setLoading(false);
     }
   }
+
+  const isStudent = form.role === "student";
 
   return (
     <AuthShell>
@@ -201,20 +270,32 @@ export default function RegisterPage() {
           <select
             className="auth-select-as-input"
             value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
+            onChange={handleRoleChange}
           >
-            <option value="teacher">教师账号</option>
             <option value="student">学生账号</option>
+            <option value="teacher">教师账号</option>
             <option value="admin">管理员账号</option>
           </select>
         </div>
 
+        {/* 学院选择：所有角色都需要选择学院/部门 */}
         <SearchSelect
-          options={classNames}
-          value={form.organization}
-          onChange={(e) => setForm({ ...form, organization: e.target.value })}
-          placeholder="院系 / 班级 / 部门"
+          options={collegeNames}
+          value={form.college}
+          onChange={handleCollegeChange}
+          placeholder={isStudent ? "请选择所属学院" : form.role === "teacher" ? "请选择所属学院" : "请选择所属部门/学院"}
         />
+
+        {/* 班级选择：仅学生需要，联动学院 */}
+        {isStudent ? (
+          <SearchSelect
+            options={classOptions}
+            value={form.organization}
+            onChange={handleOrganizationChange}
+            placeholder={loadingClasses ? "正在加载班级…" : (form.college ? "请选择所在班级" : "请先选择学院")}
+            disabled={!form.college || loadingClasses}
+          />
+        ) : null}
 
         {error ? <div className="auth-error">{error}</div> : null}
         {success ? <div className="auth-success">{success}</div> : null}

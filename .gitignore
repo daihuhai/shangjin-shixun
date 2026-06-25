@@ -47,3 +47,15 @@ frontend/test-reports/
 # 调试脚本
 _check.py
 _debug_mine.py
+
+# SQLite
+*.sqlite
+
+# 临时文件
+changes_main.txt
+main_original.txt
+*.docx
+*.png
+*.txt
+*.md
+!README.md

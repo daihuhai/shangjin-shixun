@@ -11,7 +11,14 @@ SEED_USERS = [
     {"id": "teacher-001", "username": "teacher", "password": "teacher123", "name": "戴祜豪", "role": "teacher", "organization": "软件工程学院", "student_id": None},
     {"id": "student-001", "username": "student", "password": "student123", "name": "陈晓雯", "role": "student", "organization": "软件 2301", "student_id": "202301018"},
     {"id": "student-002", "username": "student2", "password": "student123", "name": "李明轩", "role": "student", "organization": "软件 2301", "student_id": "202301021"},
-    {"id": "admin-001", "username": "admin", "password": "admin123", "name": "平台管理员", "role": "admin", "organization": "教务处", "student_id": None}
+    {"id": "admin-001", "username": "admin", "password": "admin123", "name": "平台管理员", "role": "admin", "organization": "教务处", "student_id": None},
+    {"id": "teacher-002", "username": "teacher2", "password": "teacher123", "name": "王建国", "role": "teacher", "organization": "计算机科学与技术学院", "student_id": None},
+    {"id": "student-003", "username": "student3", "password": "student123", "name": "张雨涵", "role": "student", "organization": "计算机 2301", "student_id": "202301031"},
+    {"id": "student-004", "username": "student4", "password": "student123", "name": "刘思远", "role": "student", "organization": "计算机 2301", "student_id": "202301032"},
+    {"id": "teacher-003", "username": "teacher3", "password": "teacher123", "name": "赵敏华", "role": "teacher", "organization": "信息工程学院", "student_id": None},
+    {"id": "student-005", "username": "student5", "password": "student123", "name": "周子墨", "role": "student", "organization": "信息工程 2301", "student_id": "202301041"},
+    {"id": "teacher-004", "username": "teacher4", "password": "teacher123", "name": "钱伟康", "role": "teacher", "organization": "人工智能学院", "student_id": None},
+    {"id": "student-006", "username": "student6", "password": "student123", "name": "吴梦琪", "role": "student", "organization": "人工智能 2301", "student_id": "202301051"},
 ]
 
 SEED_TASK = {
@@ -55,10 +62,31 @@ SEED_CLASSES = [
     {"name": "艺术设计学院"},
     {"name": "理学院"},
     {"name": "马克思主义学院"},
-    # ── 班级 ──
+    {"name": "汽车工程学院"},
+    {"name": "材料科学与工程学院"},
+    {"name": "化学化工学院"},
+    {"name": "航空航天学院"},
+    {"name": "医学院"},
+    {"name": "法学院"},
+    {"name": "新闻传播学院"},
+    {"name": "体育学院"},
+    {"name": "音乐舞蹈学院"},
+    {"name": "国际教育学院"},
+    # ── 班级（名称前缀需与学院名可前缀匹配）──
     {"name": "软件 2301"},
     {"name": "软件2302"},
     {"name": "软件2501"},
+    {"name": "计算机 2301"},
+    {"name": "计算机 2302"},
+    {"name": "信息工程 2301"},
+    {"name": "人工智能 2301"},
+    {"name": "大数据 2301"},
+    {"name": "电子工程 2301"},
+    {"name": "机械工程 2301"},
+    {"name": "土木工程 2301"},
+    {"name": "经济管理 2301"},
+    {"name": "外国语 2301"},
+    {"name": "艺术设计 2301"},
 ]
 
 SEED_COURSE_CLASS_MAP = {
@@ -112,18 +140,18 @@ def seed_if_empty():
 
         # ---- 种子：班级 ----
         class_map = {}  # name -> id
-        class_count = conn.execute("SELECT COUNT(*) AS c FROM classes").fetchone()["c"]
-        if class_count == 0:
-            for cl in SEED_CLASSES:
+        rows = conn.execute("SELECT id, name FROM classes").fetchall()
+        for row in rows:
+            class_map[row["name"]] = row["id"]
+        # 补充 SEED_CLASSES 中尚未入库的条目（支持已有数据的增量更新）
+        for cl in SEED_CLASSES:
+            if cl["name"] not in class_map:
                 clid = new_id()
                 conn.execute(
                     "INSERT INTO classes (id, name, created_by, created_at) VALUES (?, ?, ?, ?)",
                     (clid, cl["name"], "teacher-001", now)
                 )
                 class_map[cl["name"]] = clid
-        else:
-            rows = conn.execute("SELECT id, name FROM classes").fetchall()
-            class_map = {row["name"]: row["id"] for row in rows}
 
         # ---- 种子：课程-班级关联 ----
         cc_count = conn.execute("SELECT COUNT(*) AS c FROM course_classes").fetchone()["c"]

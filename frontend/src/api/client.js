@@ -29,10 +29,31 @@ function buildHeaders(isJson = true) {
 }
 
 async function parseResponse(response) {
-  const data = await response.json();
-  const payload = data?.data !== undefined && data?.code !== undefined ? data : data?.detail;
+  // 兜底：网络失败/后端未启动时拿到空响应或非 JSON，直接抛出可读错误
+  const contentType = response.headers.get("content-type") || "";
+  const text = await response.text();
+  if (!text) {
+    throw new Error(
+      !response.ok
+        ? `后端服务无响应（HTTP ${response.status}），请检查后端是否启动`
+        : "后端返回空响应"
+    );
+  }
+  let data;
+  try {
+    data = contentType.includes("application/json") ? JSON.parse(text) : { message: text };
+  } catch (e) {
+    throw new Error(`后端返回非 JSON 数据：${text.slice(0, 120)}`);
+  }
+  // 兼容两种格式：{code,data,message} 与 FastAPI 抛出的 {detail:{code,...}}
+  let payload = data;
+  if (data && data.detail && typeof data.detail === "object" && "code" in data.detail) {
+    payload = data.detail;
+  } else if (data && data.data !== undefined && data.code !== undefined) {
+    payload = data;
+  }
   if (!response.ok || !payload || payload.code !== 0) {
-    throw new Error(payload?.message || data?.message || "请求失败");
+    throw new Error(payload?.message || data?.message || `请求失败 (HTTP ${response.status})`);
   }
   return payload.data;
 }

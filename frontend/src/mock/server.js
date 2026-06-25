@@ -537,31 +537,143 @@ function getPortalData() {
 }
 
 function getUserAdminData() {
+  const students = [
+    { id: "s1", name: "陈晓雯", organization: "软件工程学院 / 软件 2301", role: "学生", roleKey: "student", college: "软件工程学院", className: "软件 2301", studentId: "202301018", grade: "2023级", status: "正常", createdAt: "2024-09-01T08:00:00" },
+    { id: "s2", name: "李明轩", organization: "软件工程学院 / 软件 2302", role: "学生", roleKey: "student", college: "软件工程学院", className: "软件 2302", studentId: "202301021", grade: "2023级", status: "正常", createdAt: "2024-09-01T08:00:00" },
+    { id: "s3", name: "周可", organization: "软件工程学院 / 软件 2301", role: "学生", roleKey: "student", college: "软件工程学院", className: "软件 2301", studentId: "202301032", grade: "2023级", status: "风险", createdAt: "2024-09-01T08:00:00" },
+    { id: "s4", name: "王梓涵", organization: "软件工程学院 / 软件 2302", role: "学生", roleKey: "student", college: "软件工程学院", className: "软件 2302", studentId: "202301045", grade: "2023级", status: "正常", createdAt: "2024-09-01T08:00:00" },
+    { id: "s5", name: "张雨欣", organization: "大数据学院 / 大数据 2301", role: "学生", roleKey: "student", college: "大数据学院", className: "大数据 2301", studentId: "202302003", grade: "2023级", status: "正常", createdAt: "2024-09-01T08:00:00" },
+    { id: "s6", name: "刘子豪", organization: "大数据学院 / 大数据 2301", role: "学生", roleKey: "student", college: "大数据学院", className: "大数据 2301", studentId: "202302012", grade: "2023级", status: "异常", createdAt: "2024-09-01T08:00:00" },
+    { id: "s7", name: "孙悦", organization: "汽车工程学院 / 汽服 2301", role: "学生", roleKey: "student", college: "汽车工程学院", className: "汽服 2301", studentId: "202303007", grade: "2023级", status: "正常", createdAt: "2024-09-01T08:00:00" },
+  ];
+  const teachers = [
+    { id: "t1", name: "戴祜豪", organization: "软件工程学院", role: "教师", roleKey: "teacher", college: "软件工程学院", studentId: "T001", status: "正常", createdAt: "2023-03-15T10:00:00" },
+    { id: "t2", name: "李老师", organization: "大数据学院", role: "教师", roleKey: "teacher", college: "大数据学院", studentId: "T002", status: "正常", createdAt: "2023-04-01T10:00:00" },
+    { id: "t3", name: "王老师", organization: "软件工程学院", role: "教师", roleKey: "teacher", college: "软件工程学院", studentId: "T003", status: "正常", createdAt: "2023-05-10T10:00:00" },
+    { id: "t4", name: "赵老师", organization: "汽车工程学院", role: "教师", roleKey: "teacher", college: "汽车工程学院", studentId: "T004", status: "正常", createdAt: "2023-06-01T10:00:00" },
+  ];
+  const admins = [
+    { id: "a1", name: "平台管理员", organization: "教务处", role: "超级管理员", roleKey: "admin", college: "教务处", studentId: "admin", status: "正常", createdAt: "2023-01-01T00:00:00" },
+    { id: "a2", name: "院系管理员A", organization: "软件工程学院", role: "院系管理员", roleKey: "admin", college: "软件工程学院", studentId: "A001", status: "正常", createdAt: "2023-02-01T00:00:00" },
+  ];
+
+  const orgMap = {};
+  students.forEach((s) => {
+    if (!orgMap[s.college]) {
+      orgMap[s.college] = { student: 0, teacher: 0, admin: 0, teachers: [], classes: {} };
+    }
+    orgMap[s.college].student++;
+    if (s.className) {
+      orgMap[s.college].classes[s.className] = (orgMap[s.college].classes[s.className] || 0) + 1;
+    }
+  });
+  teachers.forEach((t) => {
+    if (!orgMap[t.college]) {
+      orgMap[t.college] = { student: 0, teacher: 0, admin: 0, teachers: [], classes: {} };
+    }
+    orgMap[t.college].teacher++;
+    orgMap[t.college].teachers.push({ id: t.id, name: t.name, username: t.studentId, studentId: t.studentId, organization: t.organization });
+  });
+
+  const organizationTree = Object.entries(orgMap).map(([name, counts]) => ({
+    name,
+    studentCount: counts.student,
+    teacherCount: counts.teacher,
+    adminCount: counts.admin,
+    totalCount: counts.student + counts.teacher + counts.admin,
+    teachers: counts.teachers,
+    classes: Object.entries(counts.classes).map(([cn, sc]) => ({ name: cn, studentCount: sc })),
+  }));
+
   return {
-    students: [
-      { name: "陈晓雯", organization: "软件工程学院 / 软件 2301", role: "学生", status: "正常" },
-      { name: "李明轩", organization: "软件工程学院 / 软件 2302", role: "学生", status: "正常" },
-      { name: "周可", organization: "软件工程学院 / 软件 2301", role: "学生", status: "锁定" }
-    ],
-    teachers: [
-      { name: "戴祜豪", organization: "软件工程学院", role: "教师", status: "正常" },
-      { name: "李老师", organization: "大数据学院", role: "教师", status: "正常" }
-    ],
-    admins: [
-      { name: "平台管理员", organization: "教务处", role: "超级管理员", status: "正常" },
-      { name: "院系管理员 A", organization: "软件工程学院", role: "院系管理员", status: "正常" }
-    ],
-    organizationTree: [
-      "学校",
-      "软件工程学院",
-      "大数据学院",
-      "汽车工程学院",
-      "软件 2301 / 软件 2302 / 大数据 2301"
-    ],
+    students,
+    teachers,
+    admins,
+    organizationTree,
+    stats: {
+      totalStudents: students.length,
+      totalTeachers: teachers.length,
+      totalAdmins: admins.length,
+    },
     logs: [
       { action: "重置学生密码", actor: "平台管理员", time: "今天 09:20" },
-      { action: "审核教师注册申请", actor: "院系管理员 A", time: "昨天 16:40" }
+      { action: "审核教师注册申请", actor: "院系管理员A", time: "昨天 16:40" }
     ]
+  };
+}
+
+function getCollegeProfileData(college) {
+  const collegeDataMap = {
+    "软件工程学院": {
+      totalStudents: 328, totalTeachers: 24, totalClasses: 8, totalCourses: 12, avgScore: 78.6, totalSubmissions: 1560
+    },
+    "大数据学院": {
+      totalStudents: 186, totalTeachers: 15, totalClasses: 5, totalCourses: 8, avgScore: 75.2, totalSubmissions: 890
+    },
+    "汽车工程学院": {
+      totalStudents: 145, totalTeachers: 12, totalClasses: 4, totalCourses: 6, avgScore: 72.8, totalSubmissions: 620
+    },
+  };
+  const overview = collegeDataMap[college] || collegeDataMap["软件工程学院"];
+
+  return {
+    college: college || "软件工程学院",
+    overview,
+    abilities: [
+      { name: "实践能力", value: 32, rate: 78 },
+      { name: "理论掌握", value: 23, rate: 68 },
+      { name: "项目完成度", value: 22, rate: 75 },
+      { name: "出勤参与", value: 13, rate: 82 },
+      { name: "创新思维", value: 10, rate: 62 },
+    ],
+    overallScore: overview.avgScore,
+    gradeLabel: "B+",
+    gradeDesc: "良好",
+    scoreDistribution: [
+      { range: "90-100", count: 42 },
+      { range: "80-89", count: 128 },
+      { range: "70-79", count: 96 },
+      { range: "60-69", count: 45 },
+      { range: "<60", count: 17 },
+    ],
+    classComparison: [
+      { className: "软件 2301", avgScore: 82.5, studentCount: 42, submissionCount: 380 },
+      { className: "软件 2302", avgScore: 79.8, studentCount: 45, submissionCount: 360 },
+      { className: "软件 2201", avgScore: 77.2, studentCount: 38, submissionCount: 310 },
+      { className: "软件 2202", avgScore: 75.6, studentCount: 40, submissionCount: 280 },
+      { className: "软件 2401", avgScore: 74.3, studentCount: 41, submissionCount: 120 },
+      { className: "软件 2402", avgScore: 71.8, studentCount: 39, submissionCount: 110 },
+    ],
+    trendData: [
+      { month: "01月", avgScore: 72.5, submissions: 220 },
+      { month: "02月", avgScore: 73.8, submissions: 180 },
+      { month: "03月", avgScore: 75.6, submissions: 280 },
+      { month: "04月", avgScore: 76.2, submissions: 310 },
+      { month: "05月", avgScore: 77.9, submissions: 320 },
+      { month: "06月", avgScore: 78.6, submissions: 250 },
+    ],
+    riskStats: [
+      { level: "低风险", count: 268, color: "#22c55e" },
+      { level: "中风险", count: 43, color: "#f59e0b" },
+      { level: "高风险", count: 17, color: "#ef4444" },
+    ],
+    overallRisk: "低",
+    riskPercent: 5,
+    highRiskStudents: [
+      { id: "hr1", name: "周可", studentId: "202301032", className: "软件 2301", avgScore: 45.2, submissionCount: 3 },
+      { id: "hr2", name: "马晓宇", studentId: "202301056", className: "软件 2302", avgScore: 48.6, submissionCount: 2 },
+      { id: "hr3", name: "胡志远", studentId: "202201023", className: "软件 2201", avgScore: 51.3, submissionCount: 4 },
+      { id: "hr4", name: "林小雨", studentId: "202202011", className: "软件 2202", avgScore: 53.8, submissionCount: 3 },
+      { id: "hr5", name: "郑文博", studentId: "202401008", className: "软件 2401", avgScore: 55.2, submissionCount: 2 },
+    ],
+    suggestions: [
+      { icon: "📊", text: `学院整体均分${overview.avgScore}分，良好水平，建议继续保持项目驱动教学优势`, tag: "总览" },
+      { icon: "⚠️", text: "高风险学生17名，建议辅导员和班主任及时介入，开展一对一帮扶", tag: "预警" },
+      { icon: "📚", text: "实践能力维度表现突出（78分），建议理论课程增加案例教学提升理论掌握度", tag: "建议" },
+      { icon: "🏆", text: "软件2301班均分最高(82.5分)，建议推广其学习小组模式到其他班级", tag: "拓展" },
+      { icon: "📈", text: "近6个月均分稳步上升，教学质量持续改善，趋势向好", tag: "提升" },
+    ],
+    updatedAt: new Date().toISOString().slice(0, 16).replace("T", " "),
   };
 }
 
@@ -732,6 +844,11 @@ export async function handleMockRequest({ method, path, body }) {
 
   if (method === "GET" && path === "/admin/extras") {
     return ok(getAdminExtras());
+  }
+
+  if (method === "GET" && path.startsWith("/admin/colleges/") && path.endsWith("/profile")) {
+    const collegeName = decodeURIComponent(path.replace("/admin/colleges/", "").replace("/profile", ""));
+    return ok(getCollegeProfileData(collegeName));
   }
 
   return fail(`未实现的接口: ${method} ${path}`);
