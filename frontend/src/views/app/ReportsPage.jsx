@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { downloadFile } from "../../api/client";
+import { downloadFile, formatTime } from "../../api/client";
 import { useAsyncData } from "../../hooks/useAsyncData";
-import { exportReport, getReportSummary, getStudentProfile } from "../../services/appService";
+import { exportReport, getReportSummary, getStudentProfile, getLearningPlan, exportLearningPlanPdf } from "../../services/appService";
 import { LoadState } from "../../ui/LoadState";
 import { Panel, Table } from "../../ui/PageBlocks";
 import { useAuth } from "../../state/AuthContext";
@@ -179,6 +179,342 @@ function SuggestionCard({ item }) {
   );
 }
 
+/* 学习提升方案弹窗：8 大模块完整展示（学生端 / 管理员端共用，根据角色渲染不同模块） */
+export function LearningPlanModal({ open, loading, plan, onClose, onDownload, downloading, role = "student" }) {
+  if (!open) return null;
+  const b = plan?.baseInfo || {};
+  const c = plan?.currentAnalysis || {};
+  const s = plan?.skillPortrait || {};
+  const ta = plan?.teachingAnalysis || {};
+  const tp = plan?.teachingPortrait || {};
+  const g = plan?.goals || {};
+  const a = plan?.actionPlan || {};
+  const rc = plan?.riskControl || {};
+  const ev = plan?.evaluation || {};
+  const ai = plan?.aiSuggestions || {};
+  const weeks = a.weeks || [];
+
+  // 报告标题根据角色判断：教师 → 教师教学报告，学生 → 学生学习报告
+  const isTeacher = role === "teacher";
+  const reportTitle = isTeacher ? "📊 教师教学报告" : "📊 学生学习报告";
+  const reportSubtitle = isTeacher
+    ? "基于实训数据与 AI 分析生成的教师教学报告"
+    : "基于实训数据与 AI 分析生成的学生学习报告";
+  const loadingText = isTeacher ? "正在生成教师教学报告..." : "正在生成学习提升方案...";
+  const loadingHint = isTeacher
+    ? "AI 正在分析教学数据并生成个性化教学报告"
+    : "AI 正在分析您的学习数据并生成个性化方案";
+
+  return (
+    <div className="lp-modal-overlay" onClick={onClose}>
+      <div className="lp-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="lp-modal-header">
+          <div>
+            <h2 className="lp-modal-title">{reportTitle}</h2>
+            <p className="lp-modal-subtitle">{reportSubtitle}</p>
+          </div>
+          <div className="lp-header-actions">
+            <button
+              className="lp-download-btn"
+              type="button"
+              disabled={loading || !plan || downloading}
+              onClick={onDownload}
+            >
+              {downloading ? "生成中..." : "⬇ 下载 PDF"}
+            </button>
+            <button className="lp-close-btn" onClick={onClose} type="button">×</button>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="lp-loading">
+            <div className="lp-loading-icon">⏳</div>
+            <div>{loadingText}</div>
+            <div className="lp-loading-hint">{loadingHint}</div>
+          </div>
+        ) : plan ? (
+          <div className="lp-content">
+            {isTeacher ? (
+              <>
+                {/* ===== 教师教学报告 8 大模块 ===== */}
+                {/* 一、教师基础信息 */}
+                <section className="lp-section">
+                  <h3 className="lp-section-title"><span className="lp-badge">1</span> 教师基础信息</h3>
+                  <div className="lp-info-grid">
+                    <div className="lp-info-item"><span className="lp-info-label">教师姓名</span><span className="lp-info-value">{b.teacherName || "--"}</span></div>
+                    <div className="lp-info-item"><span className="lp-info-label">工号</span><span className="lp-info-value">{b.teacherId || "--"}</span></div>
+                    <div className="lp-info-item"><span className="lp-info-label">学院</span><span className="lp-info-value">{b.college || "--"}</span></div>
+                    <div className="lp-info-item"><span className="lp-info-label">教学阶段</span><span className="lp-info-value">{b.teachingStage || "--"}</span></div>
+                    <div className="lp-info-item"><span className="lp-info-label">创建课程</span><span className="lp-info-value">{b.courseCount ?? 0} 门</span></div>
+                    <div className="lp-info-item"><span className="lp-info-label">创建任务</span><span className="lp-info-value">{b.taskCount ?? 0} 个</span></div>
+                    <div className="lp-info-item"><span className="lp-info-label">覆盖学生</span><span className="lp-info-value">{b.studentCount ?? 0} 人</span></div>
+                    <div className="lp-info-item"><span className="lp-info-label">教学评级</span><span className="lp-info-value lp-grade">{b.gradeLabel}（{b.gradeDesc}）</span></div>
+                  </div>
+                </section>
+
+                {/* 二、教学现状分析 */}
+                <section className="lp-section">
+                  <h3 className="lp-section-title"><span className="lp-badge">2</span> 教学现状分析</h3>
+                  <div className="lp-sub-title">教学能力分析</div>
+                  <div className="lp-skill-bars">
+                    <SkillBar label="任务设计力" value={ta.taskDesign} />
+                    <SkillBar label="评分效率" value={ta.gradingEfficiency} />
+                    <SkillBar label="学生覆盖度" value={ta.studentCoverage} />
+                    <SkillBar label="反馈深度" value={ta.feedbackDepth} />
+                  </div>
+                  <div className="lp-sub-title">教学数据统计</div>
+                  <div className="lp-info-grid">
+                    <div className="lp-info-item"><span className="lp-info-label">学生提交总数</span><span className="lp-info-value">{ta.totalSubmissions ?? 0} 份</span></div>
+                    <div className="lp-info-item"><span className="lp-info-label">已评分数</span><span className="lp-info-value">{ta.scoredCount ?? 0} 份</span></div>
+                  </div>
+                  <div className="lp-sub-title">当前主要问题</div>
+                  <ul className="lp-list">
+                    {(ta.mainIssues || []).map((p, i) => (
+                      <li key={i}>• {p}</li>
+                    ))}
+                  </ul>
+                  <div className="lp-risk-box">
+                    <span className="lp-risk-label">风险判断：</span>
+                    <span className={`lp-risk-tag lp-risk-${ta.riskLevel}`}>{ta.riskLevel}风险</span>
+                    <span className="lp-risk-reason">{ta.riskReason}</span>
+                  </div>
+                </section>
+
+                {/* 三、教学能力画像 */}
+                <section className="lp-section">
+                  <h3 className="lp-section-title"><span className="lp-badge">3</span> 教学能力画像</h3>
+                  <div className="lp-ability-grid">
+                    {(tp.dimensions || []).map((d, i) => (
+                      <div className="lp-ability-item" key={i}>
+                        <div className="lp-ability-name">{d.name}</div>
+                        <div className="lp-ability-pct">{d.percent}%</div>
+                        <div className="lp-ability-rate">得分率 {d.rate}%</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="lp-ability-summary">
+                    <span>综合评级：<strong>{tp.gradeLabel}</strong></span>
+                    <span>教学类型：{tp.teachingType}</span>
+                    <span>优势：{tp.strength}</span>
+                    <span>薄弱：{tp.weakness}</span>
+                    <span>趋势：{tp.trend}</span>
+                  </div>
+                </section>
+
+                {/* 四、教学改进目标 */}
+                <section className="lp-section">
+                  <h3 className="lp-section-title"><span className="lp-badge">4</span> 教学改进目标</h3>
+                  <div className="lp-goal-row">
+                    <div className="lp-goal-block">
+                      <div className="lp-goal-label">📅 短期目标（1-2 周）</div>
+                      <ul className="lp-list">{(g.short || []).map((x, i) => <li key={i}>• {x}</li>)}</ul>
+                    </div>
+                    <div className="lp-goal-block">
+                      <div className="lp-goal-label">📆 中期目标（1-2 月）</div>
+                      <ul className="lp-list">{(g.mid || []).map((x, i) => <li key={i}>• {x}</li>)}</ul>
+                    </div>
+                  </div>
+                  <div className="lp-goal-long">
+                    <span className="lp-goal-label">🎯 长期目标（学期/阶段）</span>
+                    <span className="lp-goal-long-text">{g.long || "--"}</span>
+                  </div>
+                </section>
+
+                {/* 五、教学改进计划 */}
+                <section className="lp-section">
+                  <h3 className="lp-section-title"><span className="lp-badge">5</span> 教学改进计划</h3>
+                  <div className="lp-weeks">
+                    {weeks.map((w, i) => (
+                      <div className="lp-week-card" key={i}>
+                        <div className="lp-week-header">Week {w.week}</div>
+                        <div className="lp-week-row"><span className="lp-week-key">教学内容优化</span><span>{w.content}</span></div>
+                        <div className="lp-week-row"><span className="lp-week-key">任务设计改进</span><span>{w.task}</span></div>
+                        <div className="lp-week-row"><span className="lp-week-key">评价方式调整</span><span>{w.submit}</span></div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                {/* 六、教学风险提醒 */}
+                <section className="lp-section">
+                  <h3 className="lp-section-title"><span className="lp-badge">6</span> 教学风险提醒</h3>
+                  <div className="lp-sub-title">当前风险点</div>
+                  <ul className="lp-list">{(rc.riskPoints || []).map((p, i) => <li key={i}>⚠️ {p}</li>)}</ul>
+                  <div className="lp-sub-title">建议干预措施</div>
+                  <ul className="lp-list">{(rc.interventions || []).map((p, i) => <li key={i}>✅ {p}</li>)}</ul>
+                </section>
+
+                {/* 七、教学质量评估机制 */}
+                <section className="lp-section">
+                  <h3 className="lp-section-title"><span className="lp-badge">7</span> 教学质量评估机制</h3>
+                  <div className="lp-eval-grid">
+                    <div className="lp-eval-item"><span className="lp-eval-label">评估周期</span><span>{ev.cycle || "--"}</span></div>
+                    <div className="lp-eval-item"><span className="lp-eval-label">评估指标</span><span>{(ev.metrics || []).join("、") || "--"}</span></div>
+                    <div className="lp-eval-item"><span className="lp-eval-label">达标标准</span><span>{ev.standard || "--"}</span></div>
+                  </div>
+                </section>
+
+                {/* 八、AI 教学建议 */}
+                <section className="lp-section lp-ai-section">
+                  <h3 className="lp-section-title"><span className="lp-badge lp-badge-ai">8</span> AI 教学建议</h3>
+                  <div className="lp-ai-grid">
+                    <div className="lp-ai-item"><span className="lp-ai-key">教学发展方向</span><span className="lp-ai-val">{ai.direction || "--"}</span></div>
+                    <div className="lp-ai-item"><span className="lp-ai-key">教学提升路径</span><span className="lp-ai-val">{ai.path || "--"}</span></div>
+                    <div className="lp-ai-item"><span className="lp-ai-key">适合教学方向</span><span className="lp-ai-val">{(ai.positions || []).join("、") || "--"}</span></div>
+                  </div>
+                  <div className="lp-sub-title">个性化教学建议</div>
+                  <ul className="lp-list lp-ai-tips">{(ai.tips || []).map((t, i) => <li key={i}>💡 {t}</li>)}</ul>
+                </section>
+              </>
+            ) : (
+              <>
+                {/* ===== 学生学习报告 8 大模块 ===== */}
+                {/* 一、基础信息 */}
+                <section className="lp-section">
+                  <h3 className="lp-section-title"><span className="lp-badge">1</span> 基础信息</h3>
+                  <div className="lp-info-grid">
+                    <div className="lp-info-item"><span className="lp-info-label">学生姓名</span><span className="lp-info-value">{b.studentName || "--"}</span></div>
+                    <div className="lp-info-item"><span className="lp-info-label">学号</span><span className="lp-info-value">{b.studentId || "--"}</span></div>
+                    <div className="lp-info-item"><span className="lp-info-label">学院</span><span className="lp-info-value">{b.college || "--"}</span></div>
+                    <div className="lp-info-item"><span className="lp-info-label">班级</span><span className="lp-info-value">{b.className || "--"}</span></div>
+                    <div className="lp-info-item"><span className="lp-info-label">当前阶段</span><span className="lp-info-value">{b.stage || "--"}</span></div>
+                    <div className="lp-info-item"><span className="lp-info-label">综合评分</span><span className="lp-info-value lp-score">{b.avgScore ?? "--"} 分</span></div>
+                    <div className="lp-info-item"><span className="lp-info-label">综合评级</span><span className="lp-info-value lp-grade">{b.gradeLabel}（{b.gradeDesc}）</span></div>
+                    <div className="lp-info-item"><span className="lp-info-label">风险等级</span><span className={`lp-info-value lp-risk lp-risk-${c.riskLevel}`}>{c.riskLevel || "--"}</span></div>
+                  </div>
+                </section>
+
+                {/* 二、现状诊断 */}
+                <section className="lp-section">
+                  <h3 className="lp-section-title"><span className="lp-badge">2</span> 现状诊断</h3>
+                  <div className="lp-sub-title">学习能力分析</div>
+                  <div className="lp-skill-bars">
+                    <SkillBar label="理论掌握" value={c.theory} />
+                    <SkillBar label="实践能力" value={c.practice} />
+                    <SkillBar label="项目完成度" value={c.project} />
+                    <SkillBar label="学习主动性" value={c.attendance} />
+                  </div>
+                  <div className="lp-sub-title">当前主要问题</div>
+                  <ul className="lp-list">
+                    {(c.mainProblems || []).map((p, i) => (
+                      <li key={i}>• {p}</li>
+                    ))}
+                  </ul>
+                  <div className="lp-risk-box">
+                    <span className="lp-risk-label">风险判断：</span>
+                    <span className={`lp-risk-tag lp-risk-${c.riskLevel}`}>{c.riskLevel}风险</span>
+                    <span className="lp-risk-reason">{c.riskReason}</span>
+                  </div>
+                </section>
+
+                {/* 三、能力结构画像 */}
+                <section className="lp-section">
+                  <h3 className="lp-section-title"><span className="lp-badge">3</span> 能力结构画像</h3>
+                  <div className="lp-ability-grid">
+                    {(s.dimensions || []).map((d, i) => (
+                      <div className="lp-ability-item" key={i}>
+                        <div className="lp-ability-name">{d.name}</div>
+                        <div className="lp-ability-pct">{d.percent}%</div>
+                        <div className="lp-ability-rate">得分率 {d.rate}%</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="lp-ability-summary">
+                    <span>综合评级：<strong>{s.gradeLabel}</strong></span>
+                    <span>学习类型：{s.learnType}</span>
+                    <span>优势：{s.strength}</span>
+                    <span>薄弱：{s.weakness}</span>
+                    <span>趋势：{s.trend}</span>
+                  </div>
+                </section>
+
+                {/* 四、学习目标设定 */}
+                <section className="lp-section">
+                  <h3 className="lp-section-title"><span className="lp-badge">4</span> 学习目标设定</h3>
+                  <div className="lp-goal-row">
+                    <div className="lp-goal-block">
+                      <div className="lp-goal-label">📅 短期目标（1-2 周）</div>
+                      <ul className="lp-list">{(g.short || []).map((x, i) => <li key={i}>• {x}</li>)}</ul>
+                    </div>
+                    <div className="lp-goal-block">
+                      <div className="lp-goal-label">📆 中期目标（1-2 月）</div>
+                      <ul className="lp-list">{(g.mid || []).map((x, i) => <li key={i}>• {x}</li>)}</ul>
+                    </div>
+                  </div>
+                  <div className="lp-goal-long">
+                    <span className="lp-goal-label">🎯 长期目标（学期/阶段）</span>
+                    <span className="lp-goal-long-text">{g.long || "--"}</span>
+                  </div>
+                </section>
+
+                {/* 五、具体执行计划 */}
+                <section className="lp-section">
+                  <h3 className="lp-section-title"><span className="lp-badge">5</span> 具体执行计划</h3>
+                  <div className="lp-weeks">
+                    {weeks.map((w, i) => (
+                      <div className="lp-week-card" key={i}>
+                        <div className="lp-week-header">Week {w.week}</div>
+                        <div className="lp-week-row"><span className="lp-week-key">学习内容</span><span>{w.content}</span></div>
+                        <div className="lp-week-row"><span className="lp-week-key">实践任务</span><span>{w.task}</span></div>
+                        <div className="lp-week-row"><span className="lp-week-key">提交要求</span><span>{w.submit}</span></div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                {/* 六、风险提醒 */}
+                <section className="lp-section">
+                  <h3 className="lp-section-title"><span className="lp-badge">6</span> 风险提醒</h3>
+                  <div className="lp-sub-title">当前风险点</div>
+                  <ul className="lp-list">{(rc.riskPoints || []).map((p, i) => <li key={i}>⚠️ {p}</li>)}</ul>
+                  <div className="lp-sub-title">建议干预措施</div>
+                  <ul className="lp-list">{(rc.interventions || []).map((p, i) => <li key={i}>✅ {p}</li>)}</ul>
+                </section>
+
+                {/* 七、阶段评估机制 */}
+                <section className="lp-section">
+                  <h3 className="lp-section-title"><span className="lp-badge">7</span> 阶段评估机制</h3>
+                  <div className="lp-eval-grid">
+                    <div className="lp-eval-item"><span className="lp-eval-label">评估周期</span><span>{ev.cycle || "--"}</span></div>
+                    <div className="lp-eval-item"><span className="lp-eval-label">评估指标</span><span>{(ev.metrics || []).join("、") || "--"}</span></div>
+                    <div className="lp-eval-item"><span className="lp-eval-label">达标标准</span><span>{ev.standard || "--"}</span></div>
+                  </div>
+                </section>
+
+                {/* 八、AI 个性化建议 */}
+                <section className="lp-section lp-ai-section">
+                  <h3 className="lp-section-title"><span className="lp-badge lp-badge-ai">8</span> AI 个性化建议</h3>
+                  <div className="lp-ai-grid">
+                    <div className="lp-ai-item"><span className="lp-ai-key">推荐方向</span><span className="lp-ai-val">{ai.direction || "--"}</span></div>
+                    <div className="lp-ai-item"><span className="lp-ai-key">提升路径</span><span className="lp-ai-val">{ai.path || "--"}</span></div>
+                    <div className="lp-ai-item"><span className="lp-ai-key">适合岗位</span><span className="lp-ai-val">{(ai.positions || []).join("、") || "--"}</span></div>
+                  </div>
+                  <div className="lp-sub-title">个性化建议</div>
+                  <ul className="lp-list lp-ai-tips">{(ai.tips || []).map((t, i) => <li key={i}>💡 {t}</li>)}</ul>
+                </section>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="lp-empty">暂无方案数据</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SkillBar({ label, value }) {
+  const pct = Math.min(100, Math.max(0, value || 0));
+  const color = pct >= 75 ? "#4ECDC4" : pct >= 60 ? "#F5A623" : "#FF6B6B";
+  return (
+    <div className="lp-skill-bar">
+      <span className="lp-skill-name">{label}</span>
+      <div className="lp-skill-track"><div className="lp-skill-fill" style={{ width: `${pct}%`, background: color }} /></div>
+      <span className="lp-skill-val">{pct}%</span>
+    </div>
+  );
+}
+
 export default function ReportsPage() {
   const { user } = useAuth();
   const { data, loading, error } = useAsyncData(getReportSummary, []);
@@ -186,6 +522,39 @@ export default function ReportsPage() {
   const { data: profile, loading: profileLoading } = useAsyncData(getStudentProfile, [], isStudent);
   const [message, setMessage] = useState("");
   const [exporting, setExporting] = useState("");
+  const [planOpen, setPlanOpen] = useState(false);
+  const [planLoading, setPlanLoading] = useState(false);
+  const [plan, setPlan] = useState(null);
+  const [planDownloading, setPlanDownloading] = useState(false);
+
+  async function handleGeneratePlan() {
+    setPlanOpen(true);
+    setPlanLoading(true);
+    setPlan(null);
+    try {
+      const result = await getLearningPlan();
+      setPlan(result);
+    } catch (err) {
+      setMessage(err.message || "生成学习方案失败");
+      setPlanOpen(false);
+    } finally {
+      setPlanLoading(false);
+    }
+  }
+
+  async function handleDownloadPlan() {
+    setPlanDownloading(true);
+    setMessage("");
+    try {
+      const result = await exportLearningPlanPdf();
+      await downloadFile(`/reports/download/${result.filename}`, result.filename);
+      setMessage(`已生成学习方案 PDF：${result.filename}`);
+    } catch (err) {
+      setMessage(err.message || "下载失败");
+    } finally {
+      setPlanDownloading(false);
+    }
+  }
 
   async function handleExport(format) {
     setExporting(format);
@@ -273,7 +642,7 @@ export default function ReportsPage() {
                 title="学习建议"
                 description={`基于当前数据，给出个性化提升建议。综合评级：${profile.gradeLabel || "--"}（${profile.gradeDesc || "--"}），共 ${profile.totalSubmissions ?? 0} 次提交。`}
                 actions={
-                  <button className="ghost-button" type="button" onClick={() => window.location.reload()}>
+                  <button className="ghost-button" type="button" onClick={handleGeneratePlan}>
                      生成学习提升方案
                   </button>
                 }
@@ -303,7 +672,7 @@ export default function ReportsPage() {
                 <td>{row.type}</td>
                 <td>{row.format}</td>
                 <td>{row.filename}</td>
-                <td>{row.createdAt?.slice(0, 19).replace("T", " ")}</td>
+                <td>{formatTime(row.createdAt)}</td>
                 <td>
                   <button
                     className="ghost-button"
@@ -320,6 +689,15 @@ export default function ReportsPage() {
 
         {message ? <div className="success-text">{message}</div> : null}
       </div>
+
+      <LearningPlanModal
+        open={planOpen}
+        loading={planLoading}
+        plan={plan}
+        onClose={() => setPlanOpen(false)}
+        onDownload={handleDownloadPlan}
+        downloading={planDownloading}
+      />
     </LoadState>
   );
 }

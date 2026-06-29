@@ -112,6 +112,22 @@ export function downloadUrl(path) {
   return `${url}${separator}token=${encodeURIComponent(token)}`;
 }
 
+/**
+ * 把后端返回的时间字符串（ISO8601，可能带时区）格式化为本地时间显示。
+ * 兼容：UTC（13:00+00:00）→ 本地时区（如北京时间 21:00）。
+ */
+export function formatTime(value) {
+  if (!value) return "--";
+  try {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return value;
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  } catch {
+    return value;
+  }
+}
+
 export async function downloadFile(path, filename) {
   const response = await fetch(downloadUrl(path), {
     credentials: "include",

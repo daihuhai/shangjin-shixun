@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../state/AuthContext";
 import { useAsyncData } from "../../hooks/useAsyncData";
 import { getSubmission, getSubmissions, parseSubmission, retryEvaluation, runAutoScore, runCheck } from "../../services/appService";
+import { formatTime } from "../../api/client";
 import { LoadState } from "../../ui/LoadState";
 import { Panel, Table } from "../../ui/PageBlocks";
 import { statusLabel, statusTone } from "./shared";
@@ -108,7 +109,7 @@ export default function SubmissionsPage() {
               <div className="mini-grid">
                 <div className="mini-stat"><span>任务</span><strong>{detail.taskTitle}</strong></div>
                 <div className="mini-stat"><span>状态</span><strong>{statusLabel(detail.status)}</strong></div>
-                <div className="mini-stat"><span>提交时间</span><strong>{detail.submittedAt?.slice(0, 19).replace("T", " ")}</strong></div>
+                <div className="mini-stat"><span>提交时间</span><strong>{formatTime(detail.submittedAt)}</strong></div>
               </div>
 
               <div>

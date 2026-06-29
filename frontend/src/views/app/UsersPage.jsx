@@ -1,8 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
 import { useAsyncData } from "../../hooks/useAsyncData";
-import { getUserAdminData, getUserProfile, createUser, getCollegeNames, getClassesByCollege } from "../../services/appService";
+import { getUserAdminData, getUserProfile, createUser, getCollegeNames, getClassesByCollege, getUserLearningPlan, exportUserLearningPlanPdf } from "../../services/appService";
+import { downloadFile } from "../../api/client";
 import { LoadState } from "../../ui/LoadState";
 import CollegeInsightDashboard from "./CollegeInsightDashboard";
+import { LearningPlanModal } from "./ReportsPage";
 
 /* ===== 颜色常量 ===== */
 const DONUT_COLORS = ["#4F7CFF", "#7B61FF", "#36D1DC", "#F5A623", "#22C55E"];
@@ -268,8 +270,9 @@ function UserList({ users, roleTab, onRoleChange, selectedNode, searchQuery, onS
 }
 
 /* ===== 右侧：用户画像面板 ===== */
-function UserProfilePanel({ profile, loading, onClose }) {
+function UserProfilePanel({ profile, loading, onClose, onReportClick }) {
   const [activeTab, setActiveTab] = useState("basic");
+  const [showAllSuggestions, setShowAllSuggestions] = useState(false);
 
   if (!profile && !loading) {
     return (
@@ -301,6 +304,12 @@ function UserProfilePanel({ profile, loading, onClose }) {
   }
 
   const { user, abilities, overallScore, gradeLabel, gradeDesc, metrics, riskLevel, riskPercent, riskDesc, suggestions } = profile;
+  const isTeacher = user?.role === "教师";
+  // 从能力维度提取真实得分率
+  const simRate = abilities?.find(a => a.name === "实践能力")?.rate ?? 0;
+  const corRate = abilities?.find(a => a.name === "理论掌握")?.rate ?? 0;
+  const visibleSuggestions = showAllSuggestions ? (suggestions || []) : (suggestions || []).slice(0, 3);
+  const hasMore = (suggestions || []).length > 3;
   const tabs = [
     { key: "basic", label: "基础信息" },
     { key: "behavior", label: "行为分析" },
@@ -364,19 +373,32 @@ function UserProfilePanel({ profile, loading, onClose }) {
       <div className="um-metrics-section">
         <h4 className="um-section-title">关键指标</h4>
         <div className="um-metrics-grid">
-          <MetricCard label="平均成绩" value={metrics?.avgScore ?? 0} unit="分" sub={`班级排名 ${Math.floor(Math.random() * 20 + 1)}/35`} />
-          <MetricCard label="累计提交" value={metrics?.submissionCount ?? 0} unit="次" sub={`较上月 ↑${Math.floor(Math.random() * 20 + 5)}%`} />
-          <MetricCard label="项目完成" value={metrics?.completedTasks ?? 0} unit="个" sub={`完成率 ${Math.min(100, Math.round((metrics?.completedTasks ?? 0) / 6 * 100))}%`} />
-          <MetricCard label="出勤率" value={metrics?.attendanceRate ?? 0} unit="%" sub={`较上月 ↑${Math.floor(Math.random() * 10 + 1)}%`} />
-          <MetricCard label="课堂活跃度" value={Math.min(100, Math.round((metrics?.avgScore ?? 0) * 0.85))} unit="分" sub={`较上月 ↑${Math.floor(Math.random() * 12 + 2)}%`} />
-          <MetricCard label="代码质量" value={metrics?.avgScore > 0 ? "B" : "--"} unit="级" sub="较上月持平" />
+          {isTeacher ? (
+            <>
+              <MetricCard label="创建课程" value={metrics?.courseCount ?? 0} unit="门" sub={`综合评级 ${gradeLabel || "--"}`} />
+              <MetricCard label="创建任务" value={metrics?.taskCount ?? 0} unit="个" sub={`覆盖 ${metrics?.studentCount ?? 0} 名学生`} />
+              <MetricCard label="学生提交" value={metrics?.submissionCount ?? 0} unit="份" sub={`已评分 ${Math.round((metrics?.submissionCount ?? 0) * (metrics?.scoreRate ?? 0) / 100)} 份`} />
+              <MetricCard label="评分率" value={metrics?.scoreRate ?? 0} unit="%" sub={`反馈率 ${metrics?.feedbackRate ?? 0}%`} />
+              <MetricCard label="高风险提交" value={metrics?.highRiskCount ?? 0} unit="份" sub={`待复核 ${metrics?.pendingReview ?? 0} 份`} />
+              <MetricCard label="平均成绩" value={metrics?.avgScore ?? 0} unit="分" sub="学生整体表现" />
+            </>
+          ) : (
+            <>
+              <MetricCard label="平均成绩" value={metrics?.avgScore ?? 0} unit="分" sub={`综合评级 ${gradeLabel || "--"}`} />
+              <MetricCard label="累计提交" value={metrics?.submissionCount ?? 0} unit="次" sub={`已完成 ${metrics?.completedTasks ?? 0} 个任务`} />
+              <MetricCard label="项目完成" value={metrics?.completedTasks ?? 0} unit="个" sub={`完成率 ${(metrics?.totalTasks ?? 0) > 0 ? Math.min(100, Math.round((metrics?.completedTasks ?? 0) / metrics.totalTasks * 100)) : 0}%`} />
+              <MetricCard label="出勤率" value={metrics?.attendanceRate ?? 0} unit="%" sub={`课程共 ${metrics?.totalTasks ?? 0} 个任务`} />
+              <MetricCard label="实践能力" value={simRate} unit="%" sub="代码规范性得分率" />
+              <MetricCard label="理论掌握" value={corRate} unit="%" sub="逻辑正确性得分率" />
+            </>
+          )}
         </div>
       </div>
 
       {/* 风险评估 */}
       <div className="um-risk-section">
         <div className="um-risk-header">
-          <h4 className="um-section-title" style={{ marginBottom: 0 }}>风险评估</h4>
+          <h4 className="um-section-title" style={{ marginBottom: 0 }}>{isTeacher ? "教学风险评估" : "学习风险评估"}</h4>
           <span className="um-risk-badge" style={{
             background: riskLevel === "低" ? "#f0fdf4" : riskLevel === "中" ? "#fffbeb" : "#fef2f2",
             color: riskLevel === "低" ? "#166534" : riskLevel === "中" ? "#92400e" : "#991b1b",
@@ -401,26 +423,37 @@ function UserProfilePanel({ profile, loading, onClose }) {
       <div className="um-suggestions-section">
         <div className="um-suggestions-header">
           <h4 className="um-section-title" style={{ marginBottom: 0 }}>个性化建议</h4>
-          <span className="um-suggestions-more">更多建议 ›</span>
+          {hasMore ? (
+            <button
+              type="button"
+              className="um-suggestions-more"
+              onClick={() => setShowAllSuggestions(!showAllSuggestions)}
+            >
+              {showAllSuggestions ? "收起建议 ›" : "更多建议 ›"}
+            </button>
+          ) : null}
         </div>
         <div className="um-suggestions-list">
-          {suggestions?.map((s, i) => (
+          {visibleSuggestions?.map((s, i) => (
             <div className="um-suggestion-item" key={i}>
               <span className="um-suggestion-icon">{s.icon || "💡"}</span>
               <span className="um-suggestion-text">{s.text}</span>
               <span className="um-suggestion-tag" style={{
-                background: s.tag === "提升" ? "#eff4ff" : s.tag === "建议" ? "#f0fdf4" : "#f5f3ff",
-                color: s.tag === "提升" ? "#2f64ff" : s.tag === "建议" ? "#166534" : "#6d28d9",
+                background: s.tag === "提升" ? "#eff4ff" : s.tag === "建议" ? "#f0fdf4" : s.tag === "关注" ? "#fffbeb" : "#f5f3ff",
+                color: s.tag === "提升" ? "#2f64ff" : s.tag === "建议" ? "#166534" : s.tag === "关注" ? "#92400e" : "#6d28d9",
               }}>
                 {s.tag}
               </span>
             </div>
           ))}
+          {(!suggestions || suggestions.length === 0) && (
+            <div className="um-suggestion-item" style={{ color: "#999", justifyContent: "center" }}>暂无 AI 建议</div>
+          )}
         </div>
       </div>
 
       {/* 底部按钮 */}
-      <button className="um-profile-report-btn">查看完整报告</button>
+      <button type="button" className="um-profile-report-btn" onClick={onReportClick}>查看完整报告</button>
     </div>
   );
 }
@@ -646,6 +679,12 @@ export default function UsersPage() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [showAddUser, setShowAddUser] = useState(false);
   const [dashboardCollege, setDashboardCollege] = useState(null);
+  // 学习提升方案弹窗（管理员为指定学生生成）
+  const [planOpen, setPlanOpen] = useState(false);
+  const [planLoading, setPlanLoading] = useState(false);
+  const [plan, setPlan] = useState(null);
+  const [planDownloading, setPlanDownloading] = useState(false);
+  const [planMessage, setPlanMessage] = useState("");
 
   // 默认选中第一个学院
   useEffect(() => {
@@ -672,6 +711,40 @@ export default function UsersPage() {
   const handleViewCollegeProfile = (collegeName) => {
     setDashboardCollege(collegeName);
   };
+
+  // 查看完整报告：调管理员接口为该学生生成学习提升方案（复用 LearningPlanModal）
+  async function handleViewReport() {
+    if (!selectedUser) return;
+    setPlanOpen(true);
+    setPlanLoading(true);
+    setPlan(null);
+    setPlanMessage("");
+    try {
+      const result = await getUserLearningPlan(selectedUser.id);
+      setPlan(result);
+    } catch (err) {
+      setPlanMessage(err.message || "生成学习方案失败");
+      setPlanOpen(false);
+    } finally {
+      setPlanLoading(false);
+    }
+  }
+
+  // 下载该学生的学习提升方案 PDF（复用缓存，不调 LLM）
+  async function handleDownloadPlan() {
+    if (!selectedUser) return;
+    setPlanDownloading(true);
+    setPlanMessage("");
+    try {
+      const result = await exportUserLearningPlanPdf(selectedUser.id);
+      await downloadFile(`/reports/download/${result.filename}`, result.filename);
+      setPlanMessage(`已生成 PDF：${result.filename}`);
+    } catch (err) {
+      setPlanMessage(err.message || "下载失败");
+    } finally {
+      setPlanDownloading(false);
+    }
+  }
 
   const allUsers = useMemo(() => {
     if (!data) return [];
@@ -712,7 +785,7 @@ export default function UsersPage() {
                 <div className="um-stat-value">{stats.totalAdmins}</div>
               </div>
             </div>
-            <div className="um-stats-date">数据截至：2024-05-20</div>
+            <div className="um-stats-date">数据截至：{new Date().toISOString().slice(0, 10)}</div>
           </div>
         </div>
 
@@ -737,6 +810,7 @@ export default function UsersPage() {
             profile={profileData}
             loading={profileLoading}
             onClose={() => { setSelectedUser(null); setProfileData(null); }}
+            onReportClick={handleViewReport}
           />
         </div>
       </div>
@@ -755,6 +829,22 @@ export default function UsersPage() {
           collegeList={data?.organizationTree || []}
           onClose={() => setDashboardCollege(null)}
         />
+      ) : null}
+      <LearningPlanModal
+        open={planOpen}
+        loading={planLoading}
+        plan={plan}
+        onClose={() => setPlanOpen(false)}
+        onDownload={handleDownloadPlan}
+        downloading={planDownloading}
+        role={selectedUser?.roleKey === "teacher" ? "teacher" : "student"}
+      />
+      {planMessage ? (
+        <div className="um-plan-toast" style={{
+          position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+          background: "rgba(30,41,59,0.92)", color: "#fff", padding: "10px 20px",
+          borderRadius: 8, fontSize: 13, zIndex: 9999, boxShadow: "0 4px 12px rgba(0,0,0,0.15)"
+        }}>{planMessage}</div>
       ) : null}
     </LoadState>
   );

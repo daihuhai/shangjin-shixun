@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../state/AuthContext";
 import { useAsyncData } from "../../hooks/useAsyncData";
-import { downloadFile } from "../../api/client";
+import { downloadFile, formatTime } from "../../api/client";
 import {
   exportReport,
   getReferenceDocs,
@@ -306,7 +306,7 @@ function SubmissionDetailPanel({ detail, user, busy, message, onAction }) {
         <div className="mini-stat"><span>学号</span><strong>{detail.studentNumber}</strong></div>
         <div className="mini-stat"><span>版本</span><strong>v{detail.version}</strong></div>
         <div className="mini-stat"><span>状态</span><strong>{statusLabel(detail.status)}</strong></div>
-        <div className="mini-stat"><span>提交时间</span><strong>{detail.submittedAt?.slice(0, 19).replace("T", " ")}</strong></div>
+        <div className="mini-stat"><span>提交时间</span><strong>{formatTime(detail.submittedAt)}</strong></div>
         <div className="mini-stat"><span>风险</span><strong>{detail.riskLevel}</strong></div>
       </div>
 
@@ -619,7 +619,7 @@ export default function TaskDetailPage() {
                     <td><span className={`status-chip status-${statusTone(statusLabel(row.status))}`}>{statusLabel(row.status)}</span></td>
                     <td><span className={`status-chip status-${statusTone(row.riskLevel)}`}>{row.riskLevel}</span></td>
                     <td>{row.finalScore ?? row.aiTotalScore ?? "--"}</td>
-                    <td>{row.submittedAt?.slice(0, 19).replace("T", " ")}</td>
+                    <td>{formatTime(row.submittedAt)}</td>
                   </tr>
                 )}
               />

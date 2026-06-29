@@ -121,6 +121,23 @@ export async function getStudentProfile() {
   return get("/reports/profile");
 }
 
+export async function getLearningPlan() {
+  return get("/reports/learning-plan");
+}
+
+export async function exportLearningPlanPdf() {
+  return get("/reports/learning-plan/pdf");
+}
+
+// 管理员端：为指定学生生成学习提升方案 / 导出 PDF
+export async function getUserLearningPlan(userId) {
+  return get(`/admin/users/${userId}/learning-plan`);
+}
+
+export async function exportUserLearningPlanPdf(userId) {
+  return get(`/admin/users/${userId}/learning-plan/pdf`);
+}
+
 export async function exportReport(format, reportType = "class", taskId) {
   const params = new URLSearchParams({ format, report_type: reportType });
   if (taskId) {
@@ -233,4 +250,22 @@ export async function getScoreDistribution() {
 
 export async function getTopErrors(limit = 10) {
   return get(`/dashboard/top-errors?limit=${limit}`);
+}
+
+// ========== 管理员层级化数据面板 ==========
+
+export async function getAdminSchoolOverview() {
+  return get("/admin/dashboard/school");
+}
+
+export async function getAdminCollegeRanking() {
+  return get("/admin/dashboard/colleges");
+}
+
+export async function getAdminCollegeDetail(collegeName) {
+  return get(`/admin/dashboard/colleges/${encodeURIComponent(collegeName)}`);
+}
+
+export async function getAdminClassDetail(className) {
+  return get(`/admin/dashboard/classes/${encodeURIComponent(className)}`);
 }

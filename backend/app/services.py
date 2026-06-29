@@ -480,6 +480,239 @@ def serialize_submission(row: dict) -> dict:
     }
 
 
+def teacher_profile(user_id: str) -> dict:
+    """生成教师教学画像：教学能力维度 + 标签 + 基础数据（不含AI建议）"""
+    with get_conn() as conn:
+        # 该教师创建的课程
+        courses = rows_to_list(conn.execute(
+            "SELECT id, name FROM courses WHERE created_by = ?", (user_id,)
+        ).fetchall())
+        course_ids = [c["id"] for c in courses]
+
+        # 该教师创建的任务（含 course_id 匹配 + course 名称匹配）
+        if course_ids:
+            placeholders = ",".join("?" for _ in course_ids)
+            tasks_by_id = rows_to_list(conn.execute(
+                f"SELECT id, title, course_id, course FROM tasks WHERE course_id IN ({placeholders})", course_ids
+            ).fetchall())
+        else:
+            tasks_by_id = []
+        # 也查一下没有 course_id 但 course 名称匹配的任务
+        task_titles_set = set()
+        for c in courses:
+            cname = c["name"].replace(" ", "")
+            extra = rows_to_list(conn.execute(
+                "SELECT id, title, course_id, course FROM tasks WHERE course_id IS NULL AND REPLACE(course, ' ', '') = ?",
+                (cname,)
+            ).fetchall())
+            for t in extra:
+                if t["id"] not in [x["id"] for x in tasks_by_id]:
+                    tasks_by_id.append(t)
+
+        task_ids = [t["id"] for t in tasks_by_id]
+        total_tasks = len(tasks_by_id)
+
+        # 收集这些任务的所有学生提交
+        submissions = []
+        if task_ids:
+            placeholders = ",".join("?" for _ in task_ids)
+            submissions = rows_to_list(conn.execute(
+                f"""SELECT s.*, t.title AS task_title, t.course,
+                       u.name AS student_name, u.organization AS student_org,
+                       sr.ai_total_score, sr.teacher_adjusted_score, sr.final_score,
+                       sr.dimensions_json, sr.teacher_comment,
+                       pr.status AS parse_status, cr.status AS check_status,
+                       s.risk_level
+                FROM submissions s
+                JOIN tasks t ON t.id = s.task_id
+                JOIN users u ON u.id = s.student_id
+                LEFT JOIN score_records sr ON sr.submission_id = s.id
+                LEFT JOIN parse_results pr ON pr.submission_id = s.id
+                LEFT JOIN check_reports cr ON cr.submission_id = s.id
+                WHERE s.task_id IN ({placeholders})
+                ORDER BY s.submitted_at DESC""",
+                task_ids
+            ).fetchall())
+
+        # 统计指标
+        total_submissions = len(submissions)
+        unique_students = set(s["student_id"] for s in submissions)
+        unique_student_count = len(unique_students)
+
+        # 评分统计
+        all_scores = []
+        scored_count = 0
+        pending_review = 0
+        high_risk_count = 0
+        similarity_scores = []
+        correctness_scores = []
+        completeness_scores = []
+        feedback_count = 0
+        teacher_adjusted_count = 0
+        task_sub_count = {}  # task_id -> submission count
+
+        for row in submissions:
+            tid = row.get("task_id")
+            task_sub_count[tid] = task_sub_count.get(tid, 0) + 1
+
+            score_row = None
+            with get_conn() as conn2:
+                score_row = conn2.execute(
+                    "SELECT * FROM score_records WHERE submission_id = ?", (row["id"],)
+                ).fetchone()
+
+            if score_row:
+                final = row.get("final_score") or _row_get(score_row, "ai_total_score")
+                if final is not None:
+                    all_scores.append(final)
+                    scored_count += 1
+                if _row_get(score_row, "teacher_adjusted_score") is not None:
+                    teacher_adjusted_count += 1
+                if _row_get(score_row, "teacher_comment"):
+                    feedback_count += 1
+
+                dims = _parse_score_dimensions(_row_get(score_row, "dimensions_json"))
+                sim = dims.get("similarityScore")
+                cor = dims.get("correctnessScore")
+                com = dims.get("completenessScore")
+                if sim is None or cor is None or com is None:
+                    for dim in dims.get("dimensions", []):
+                        dim_name = dim.get("name", "")
+                        dim_score = dim.get("aiScore") or dim.get("score")
+                        if dim_score is not None:
+                            if "代码质量" in dim_name or "相似度" in dim_name:
+                                if sim is None: sim = dim_score
+                            elif "文档" in dim_name or "正确性" in dim_name:
+                                if cor is None: cor = dim_score
+                            elif "功能" in dim_name or "完整" in dim_name:
+                                if com is None: com = dim_score
+                if sim is not None: similarity_scores.append(sim)
+                if cor is not None: correctness_scores.append(cor)
+                if com is not None: completeness_scores.append(com)
+
+            if row.get("risk_level") == "高":
+                high_risk_count += 1
+
+            status = row.get("status") or ""
+            if status in ("submitted", "parsed"):
+                pending_review += 1
+
+        avg_score = round(sum(all_scores) / len(all_scores), 1) if all_scores else 0
+        score_rate = round(scored_count / max(total_submissions, 1) * 100, 1)
+        feedback_rate = round(feedback_count / max(scored_count, 1) * 100, 1)
+
+        # 教学能力维度（基于教师教学数据计算）
+        # 任务设计力：该教师创建的任务数 / 平台平均任务数（归一化）
+        with get_conn() as conn3:
+            platform_task_count = conn3.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+            platform_teacher_count = conn3.execute(
+                "SELECT COUNT(DISTINCT created_by) FROM courses WHERE created_by IN (SELECT id FROM users WHERE role='teacher')"
+            ).fetchone()[0]
+        avg_tasks_per_teacher = platform_task_count / max(platform_teacher_count, 1)
+        task_design_rate = min(100, round(total_tasks / max(avg_tasks_per_teacher, 1) * 50, 1))
+
+        # 评分效率：已评分数 / 总提交数
+        grading_rate = score_rate
+
+        # 学生覆盖度：参与学生数 / 平台总学生数
+        with get_conn() as conn4:
+            platform_student_count = conn4.execute(
+                "SELECT COUNT(*) FROM users WHERE role='student'"
+            ).fetchone()[0]
+        coverage_rate = min(100, round(unique_student_count / max(platform_student_count, 1) * 100, 1)) if platform_student_count > 0 else 0
+
+        # 反馈深度：有教师评语的比例
+        feedback_depth_rate = feedback_rate
+
+        # 综合评分 = 四个维度的加权平均
+        overall_score = round(
+            task_design_rate * 0.25 + grading_rate * 0.30 + coverage_rate * 0.20 + feedback_depth_rate * 0.25,
+            1
+        )
+
+        # 能力维度（归一化到百分比用于饼图）
+        total_rate = task_design_rate + grading_rate + coverage_rate + feedback_depth_rate
+        if total_rate > 0:
+            abilities = [
+                {"name": "任务设计力", "value": round(task_design_rate / total_rate * 100), "rate": task_design_rate},
+                {"name": "评分效率", "value": round(grading_rate / total_rate * 100), "rate": grading_rate},
+                {"name": "学生覆盖度", "value": round(coverage_rate / total_rate * 100), "rate": coverage_rate},
+                {"name": "反馈深度", "value": round(feedback_depth_rate / total_rate * 100), "rate": feedback_depth_rate},
+            ]
+        else:
+            abilities = [
+                {"name": "任务设计力", "value": 25, "rate": 0},
+                {"name": "评分效率", "value": 25, "rate": 0},
+                {"name": "学生覆盖度", "value": 25, "rate": 0},
+                {"name": "反馈深度", "value": 25, "rate": 0},
+            ]
+
+        # 综合评级
+        if overall_score >= 85:
+            grade_label, grade_desc = "A", "优秀"
+        elif overall_score >= 70:
+            grade_label, grade_desc = "B+", "良好"
+        elif overall_score >= 60:
+            grade_label, grade_desc = "B", "及格"
+        elif overall_score >= 40:
+            grade_label, grade_desc = "C+", "需努力"
+        else:
+            grade_label, grade_desc = "C", "待提升"
+
+        # 标签推断
+        dim_sorted = sorted(abilities, key=lambda x: x["rate"], reverse=True)
+        strength = dim_sorted[0]["name"] if abilities else "数据不足"
+        weak = dim_sorted[-1]["name"] if abilities else "数据不足"
+
+        if grading_rate >= 80 and feedback_depth_rate >= 60:
+            learn_type = "严谨细致型"
+        elif task_design_rate >= 70:
+            learn_type = "创新设计型"
+        elif coverage_rate >= 60:
+            learn_type = "广泛覆盖型"
+        else:
+            learn_type = "稳步发展型"
+
+        if grading_rate > feedback_depth_rate + 20:
+            trend = "评分积极"
+        elif feedback_depth_rate > grading_rate + 20:
+            trend = "反馈深入"
+        else:
+            trend = "均衡发展"
+
+        recommend = f"加强{weak}方面的教学投入" if weak != "数据不足" else "保持当前教学节奏"
+
+        return {
+            "gradeLabel": grade_label,
+            "gradeDesc": grade_desc,
+            "avgScore": avg_score,
+            "totalSubmissions": total_submissions,
+            "abilities": abilities,
+            "tags": {
+                "learnType": learn_type,
+                "strength": strength,
+                "weakness": weak,
+                "trend": trend,
+                "recommend": recommend,
+            },
+            "llmContext": {
+                "courseCount": len(courses),
+                "taskCount": total_tasks,
+                "submissionCount": total_submissions,
+                "studentCount": unique_student_count,
+                "scoredCount": scored_count,
+                "avgScore": avg_score,
+                "scoreRate": score_rate,
+                "feedbackRate": feedback_rate,
+                "highRiskCount": high_risk_count,
+                "pendingReview": pending_review,
+                "teacherAdjustedCount": teacher_adjusted_count,
+                "taskTitles": list(set(t.get("title", "") for t in tasks_by_id))[:10],
+                "courseNames": [c["name"] for c in courses],
+            },
+        }
+
+
 def student_profile(user_id: str) -> dict:
     """生成学生画像：能力分布饼图 + 标签 + 基础数据（不含AI建议，建议由路由层异步调用LLM）"""
     rows = build_submission_rows({"student_id": user_id})

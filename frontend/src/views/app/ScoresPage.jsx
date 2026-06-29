@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "../../state/AuthContext";
 import { useAsyncData } from "../../hooks/useAsyncData";
 import { getScores, getTeacherScores, saveTeacherScore } from "../../services/appService";
+import { formatTime } from "../../api/client";
 import { MODEL_NAME } from "../../config/brand";
 import { LoadState } from "../../ui/LoadState";
 import { Panel, Table } from "../../ui/PageBlocks";
@@ -160,7 +161,7 @@ export default function ScoresPage() {
                             {displayScore}
                           </strong>
                         </td>
-                        <td>{row.submittedAt?.slice(0, 19).replace("T", " ")}</td>
+                        <td>{formatTime(row.submittedAt)}</td>
                       </tr>
                     );
                   }}

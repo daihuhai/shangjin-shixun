@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAsyncData } from "../../hooks/useAsyncData";
 import { getModelConfig, getModelHealth, testModel } from "../../services/appService";
+import { formatTime } from "../../api/client";
 import { MODEL_NAME, PLATFORM_NAME } from "../../config/brand";
 import { LoadState } from "../../ui/LoadState";
 import { Panel, Table } from "../../ui/PageBlocks";
@@ -52,7 +53,7 @@ export default function ModelsPage() {
                 <td>{MODEL_NAME}</td>
                 <td>{row.latency_ms} ms</td>
                 <td><span className={`status-chip status-${statusTone(row.success ? "成功" : "失败")}`}>{row.success ? "成功" : "失败"}</span></td>
-                <td>{row.created_at?.slice(0, 19).replace("T", " ")}</td>
+                <td>{formatTime(row.created_at)}</td>
               </tr>
             )}
           />
